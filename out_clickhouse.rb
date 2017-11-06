@@ -9,12 +9,18 @@ module Fluent
 
         DEFAULT_TIMEKEY = 60 * 60 * 24
 
+        desc "IP or fqdn of ClickHouse node"
         config_param :host, :string
+        desc "Port of ClickHouse HTTP interface"
         config_param :port, :integer, default: 8123
+        desc "Database to use"
         config_param :database, :string, default: "default"
+        desc "Table to use"
         config_param :table, :string
-	    # config_param :timezone, :string, default: ''
+        desc "Offset in minutes, could be useful to substract timestamps because of timezones"
+	    config_param :tz_offset, :integer, default: 0
 	    # TODO auth and SSL params. and maybe gzip
+        desc "Order of fields while insert"
 	    config_param :fields, :array, value_type: :string
         config_section :format do
             config_set_default :@type, "out_file"
@@ -28,11 +34,13 @@ module Fluent
 
         def configure(conf)
         	super
-	        @host = conf["host"]
-		    @port = conf["port"]
-        	@uri_str = "http://#{ conf['host'] }:#{ conf['port']}/"
-        	@table = conf["table"]
-		    @fields = fields.select{|f| !f.empty? }
+	        @host       = conf["host"]
+		    @port       = conf["port"]
+        	@uri_str    = "http://#{ conf['host'] }:#{ conf['port']}/"
+            @database   = conf["database"]
+        	@table      = conf["table"]
+		    @fields     = fields.select{|f| !f.empty? }
+            @tz_offset  = conf["tz_offset"].to_i
         	uri = URI(@uri_str)
 		    begin
         		res = Net::HTTP.get_response(uri)
@@ -45,7 +53,7 @@ module Fluent
         end
 
         def format(tag, timestamp, record)
-		    datetime = Time.at(timestamp).to_datetime
+		    datetime = Time.at(timestamp + @tz_offset.to_i * 60).to_datetime
 		    row = Array.new
 		    @fields.map { |key|
 		    	if key == "tag" 
@@ -55,7 +63,7 @@ module Fluent
 		    	elsif key == "_DATE"
 		    		row << datetime.strftime("%Y-%m-%d")	# ClickHouse 1.1.54292 has a bug in parsing UNIX timestamp into Date. 
 		    	else
-		    	       	row << record[key]
+		    	    row << record[key]
 		    	end
 		    }
 		    "#{row.join("\t")}\n"
@@ -63,7 +71,7 @@ module Fluent
 
         def write(chunk)
 		    http = Net::HTTP.new(@host, @port.to_i)
-		    uri = URI.encode("#{ @uri_str }?query=INSERT INTO #{ @table } FORMAT TabSeparated")
+		    uri = URI.encode("#{ @uri_str }?query=INSERT INTO #{ @database }.#{ @table } FORMAT TabSeparated")
 		    req = Net::HTTP::Post.new(URI.parse(uri))
             req.body = chunk.read
             resp = http.request(req)

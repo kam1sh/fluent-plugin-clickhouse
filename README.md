@@ -1,7 +1,7 @@
 # What is this?
-It's a output plugin for [Fluentd](https://www.fluentd.org/), that sends data into [Yandex ClickHouse](clickhouse.yandex) database. By now it supports buffered output (*I still don't know how*) and handling few exceptions.  
+It's a output plugin for [Fluentd](https://www.fluentd.org/), that sends data into [Yandex ClickHouse](https://clickhouse.yandex) database. By now it supports buffered output (*I still don't know how*) and handling few exceptions.  
 # How to use it?
-I'm not a ruby programmer who knows how to write gems, so **just put `out_clickhouse.rb` to /etc/td-agent/plugin**.  
+I'm not a ruby programmer who knows how to write gems, so **just put [out_clickhouse.rb](out_clickhouse.rb) to /etc/td-agent/plugin**.  
 There's example td-agent.conf:
 ```
 <source>
