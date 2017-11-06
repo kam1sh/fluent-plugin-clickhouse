@@ -7,7 +7,7 @@ module Fluent
     class ClickhouseOutput < BufferedOutput
         Fluent::Plugin.register_output("clickhouse", self)
 
-        DEFAULT_TIMEKEY = 10
+        DEFAULT_TIMEKEY = 60 * 60 * 24
 
         config_param :host, :string
         config_param :port, :integer, default: 8123

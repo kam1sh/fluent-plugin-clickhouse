@@ -35,5 +35,6 @@ After a few seconds, when buffer flushes, in ClickHouse you could see this:
 # Wow, it doesn't even support HTTP auth  
 Yes, and besides auth, there's still a work to do:  
 * SSL
+* Timezones that doesn't suck
 * GZIP. ClickHouse supports compressing, so why not?
 * and more
