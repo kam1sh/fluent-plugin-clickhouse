@@ -34,12 +34,12 @@ module Fluent
 
         def configure(conf)
         	super
-	        @host       = conf["host"]
-		    @port       = conf["port"] == nil ? 8123 : conf["port"]
-        	@uri_str    = "http://#{ conf['host'] }:#{ conf['port']}/"
-            @database   = conf["database"] == nil ? "default" : conf["database"]
-        	@table      = conf["table"]
-		    @fields     = fields.select{|f| !f.empty? }
+            @host       = conf["host"]
+            @port       = conf["port"] || 8123
+            @uri_str    = "http://#{ conf['host'] }:#{ conf['port']}/"
+            @database   = conf["database"] || "default"
+            @table      = conf["table"]
+            @fields     = fields.select{|f| !f.empty? }
             @tz_offset  = conf["tz_offset"].to_i
         	uri = URI(@uri_str)
 		    begin
