@@ -35,9 +35,9 @@ module Fluent
         def configure(conf)
         	super
 	        @host       = conf["host"]
-		    @port       = conf["port"]
+		    @port       = conf["port"] == nil ? 8123 : conf["port"]
         	@uri_str    = "http://#{ conf['host'] }:#{ conf['port']}/"
-            @database   = "default" if conf["database"].nil? else conf["database"]
+            @database   = conf["database"] == nil ? "default" : conf["database"]
         	@table      = conf["table"]
 		    @fields     = fields.select{|f| !f.empty? }
             @tz_offset  = conf["tz_offset"].to_i
@@ -53,7 +53,7 @@ module Fluent
         end
 
         def format(tag, timestamp, record)
-		    datetime = Time.at(timestamp + @tz_offset.to_i * 60).to_datetime
+		    datetime = Time.at(timestamp + @tz_offset * 60).to_datetime
 		    row = Array.new
 		    @fields.map { |key|
 		    	case key
@@ -72,7 +72,6 @@ module Fluent
 
         def write(chunk)
 		    http = Net::HTTP.new(@host, @port.to_i)
-            log.info "#{ @uri_str }?query=INSERT INTO #{ @database }.#{ @table } FORMAT TabSeparated"
 		    uri = URI.encode("#{ @uri_str }?query=INSERT INTO #{ @database }.#{ @table } FORMAT TabSeparated")
 		    req = Net::HTTP::Post.new(URI.parse(uri))
             req.body = chunk.read
