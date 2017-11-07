@@ -37,7 +37,7 @@ module Fluent
 	        @host       = conf["host"]
 		    @port       = conf["port"]
         	@uri_str    = "http://#{ conf['host'] }:#{ conf['port']}/"
-            @database   = conf["database"]
+            @database   = "default" if conf["database"].nil? else conf["database"]
         	@table      = conf["table"]
 		    @fields     = fields.select{|f| !f.empty? }
             @tz_offset  = conf["tz_offset"].to_i
@@ -46,9 +46,9 @@ module Fluent
         		res = Net::HTTP.get_response(uri)
 			rescue Errno::ECONNREFUSED
 		    	raise Fluent::ConfigError, "Couldn't connect to ClickHouse at #{ @uri_str } - connection refused" 
-		end
-		if res.code != "200"
-        	    raise Fluent::ConfigError, "ClickHouse server responded non-200 code!!1"
+		    end
+		    if res.code != "200"
+        	    raise Fluent::ConfigError, "ClickHouse server responded non-200 code: #{ res.body }"
         	end
         end
 
@@ -56,11 +56,12 @@ module Fluent
 		    datetime = Time.at(timestamp + @tz_offset.to_i * 60).to_datetime
 		    row = Array.new
 		    @fields.map { |key|
-		    	if key == "tag" 
+		    	case key
+                when "tag" 
 		    		row << tag
-		    	elsif key == "_DATETIME"
+		    	when "_DATETIME"
 		    		row << datetime.strftime("%s")          # To UNIX timestamp
-		    	elsif key == "_DATE"
+		    	when "_DATE"
 		    		row << datetime.strftime("%Y-%m-%d")	# ClickHouse 1.1.54292 has a bug in parsing UNIX timestamp into Date. 
 		    	else
 		    	    row << record[key]
@@ -71,6 +72,7 @@ module Fluent
 
         def write(chunk)
 		    http = Net::HTTP.new(@host, @port.to_i)
+            log.info "#{ @uri_str }?query=INSERT INTO #{ @database }.#{ @table } FORMAT TabSeparated"
 		    uri = URI.encode("#{ @uri_str }?query=INSERT INTO #{ @database }.#{ @table } FORMAT TabSeparated")
 		    req = Net::HTTP::Post.new(URI.parse(uri))
             req.body = chunk.read
