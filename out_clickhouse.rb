@@ -2,6 +2,7 @@ require 'fluent/output'
 require 'fluent/config/error'
 require 'net/http'
 require 'date'
+require 'csv'
 
 module Fluent
     class ClickhouseOutput < BufferedOutput
@@ -22,9 +23,6 @@ module Fluent
 	    # TODO auth and SSL params. and maybe gzip
         desc "Order of fields while insert"
 	    config_param :fields, :array, value_type: :string
-        config_section :format do
-            config_set_default :@type, "out_file"
-        end
         config_section :buffer do
             config_set_default :@type, "file"
             config_set_default :chunk_keys, ["time"]
@@ -41,7 +39,10 @@ module Fluent
             @table      = conf["table"]
             @fields     = fields.select{|f| !f.empty? }
             @tz_offset  = conf["tz_offset"].to_i
-        	uri = URI(@uri_str)
+        	test_connection(URI(@uri_str))
+        end
+
+        def test_connection(uri)
             begin
             	res = Net::HTTP.get_response(uri)
             rescue Errno::ECONNREFUSED
@@ -67,14 +68,16 @@ module Fluent
             	    row << record[key]
             	end
             }
-            "#{row.join("\t")}\n"
+            CSV.generate_line(row)
     	end
 
         def write(chunk)
-            http = Net::HTTP.new(@host, @port.to_i)
-            uri = URI.encode("#{ @uri_str }?query=INSERT INTO #{ @database }.#{ @table } FORMAT TabSeparated")
-            req = Net::HTTP::Post.new(URI.parse(uri))
+            uri = URI(@uri_str)
+            uri_params = {"query" => "INSERT INTO #{ @database }.#{ @table } FORMAT CSV"}
+            uri.query = URI.encode_www_form(uri_params)
+            req = Net::HTTP::Post.new(uri)
             req.body = chunk.read
+            http = Net::HTTP.new(uri.hostname, uri.port)
             resp = http.request(req)
             if resp.code != "200"
             	log.warn "Clickhouse responded: #{resp.body}"
