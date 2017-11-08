@@ -13,16 +13,17 @@ There's example td-agent.conf:
     host 127.0.0.1
     port 8123
     table FLUENT
-    fields _DATE,_DATETIME,tag,number # _DATE and _DATETIME is a internal plugin fields.
+    datetime_name DateTime # name for internal fluentd datetime field
+    fields DateTime,tag,Num # in this order values will be inserted in CH
 </match>
 ```
 Before launching td-agent, create table into ClickHouse:  
-`CREATE TABLE default.FLUENT ( Date Date,  DateTime DateTime,  Str String,  Num Int32) ENGINE = MergeTree(Date, Date, DateTime, 8192)`  
+`CREATE TABLE FLUENT ( Date Date MATERIALIZED toDate(DateTime),  DateTime DateTime,  Str String,  Num Int32) ENGINE = MergeTree(Date, Date, DateTime, 8192)`  
 Start td-agent and send a few events to fluentd:  
 ```
-curl -X POST -d 'json={"number":1}' http://localhost:8888/inp
-curl -X POST -d 'json={"number":2}' http://localhost:8888/inp
-curl -X POST -d 'json={"number":3}' http://localhost:8888/inp
+curl -X POST -d 'json={"Num":1}' http://localhost:8888/inp
+curl -X POST -d 'json={"Num":2}' http://localhost:8888/inp
+curl -X POST -d 'json={"Num":3}' http://localhost:8888/inp
 ```
 After a few seconds, when buffer flushes, in ClickHouse you could see this:
 ```:) SELECT * FROM FLUENT ;  

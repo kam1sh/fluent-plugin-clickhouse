@@ -25,6 +25,8 @@ module Fluent
         config_param :fields, :array, value_type: :string
         desc "Which part of tag should be taken"
         config_param :tag_part, :integer, default: nil
+        desc "Name of internal fluentd time field (if need to use)"
+        config_param :datetime_name, :string, default: nil
         config_section :buffer do
             config_set_default :@type, "file"
             config_set_default :chunk_keys, ["time"]
@@ -40,6 +42,7 @@ module Fluent
             @fields             = fields.select{|f| !f.empty? }
             @tz_offset          = conf["tz_offset"].to_i
             @tag_part           = conf["tag_part"]
+            @datetime_name      = conf["datetime_name"]
             test_connection(conf)
         end
 
@@ -63,30 +66,27 @@ module Fluent
         end
 
         def format(tag, timestamp, record)
-            datetime = Time.at(timestamp + @tz_offset * 60).to_datetime
-            row = Array.new
-            @fields.map { |key|
-            	case key
-                when "tag" 
-                    if @tag_part == nil
-            		    row << tag
+            if @datetime_name
+                record[@datetime_name] = timestamp + @tz_offset * 60
+            end
+            row = []
+            @fields.each { |key|
+                if key == "tag" 
+                    if @tag_part then val = tag
                     else
-                        row << tag.split(".")[@tag_part.to_i]
+                        val = tag.split(".")[@tag_part.to_i]
                     end
-            	when "_DATETIME"
-                    row << datetime.strftime("%s")          # To UNIX timestamp
-            	when "_DATE"
-                    row << datetime.strftime("%Y-%m-%d")	# ClickHouse 1.1.54292 has a bug in parsing UNIX timestamp into Date. 
-            	else
-            	    row << record[key]
-            	end
+                else
+            	    val = record[key]
+                end
+                row << val
             }
-            CSV.generate_line(row)
+            return CSV.generate_line(row)
     	end
 
         def write(chunk)
             uri = @uri.clone
-            query = {"query" => "INSERT INTO #{ @table } FORMAT CSV"}
+            query = {"query" => "INSERT INTO #{@table} (#{@fields.join(",")}) FORMAT CSV"}
             uri.query = URI.encode_www_form(@uri_params.merge(query))
             req = Net::HTTP::Post.new(uri)
             req.body = chunk.read
